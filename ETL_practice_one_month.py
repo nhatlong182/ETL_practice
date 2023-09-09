@@ -81,7 +81,7 @@ def main_task():
         print('Finished Processing {}'.format(file_name2))
 
     
-    print('')
+    print('-----------Transforming Data ---------')
     active = active.groupby('Contract').agg(count('Contract').alias('frequency'))
     result1 = result1.groupby('Contract').agg(sum('TVDuration').alias("TVDuration"),\
          sum('MovieDuration').alias("MovieDuration"), sum('RelaxDuration').alias("RelaxDuration"),\
@@ -93,20 +93,18 @@ def main_task():
          sum(col('TVDuration') + col('SportDuration') + col('ChildDuration') + col('RelaxDuration') + col('MovieDuration'))\
         .over(windowSpecAgg))
 
-    # add most watch column
     result1 = most_watch(result1)
-    # add taste column
     result1 = customer_taste(result1)
 
-    result1 = result1.join(active, on="Contract", how="left").withColumn('active_rate', col('frequency').cast('int') / ed * 100)\
-        .withColumn('rp_date', lit('20220501'))\
-            .withColumn('report_date', to_date('rp_date', 'yyyyMMdd'))
+    result1 = result1.join(active, on="Contract", how="left").withColumn('rp_date', lit('20220501'))\
+                      .withColumn('report_date', to_date('rp_date', 'yyyyMMdd'))
 
     result1 = result1.withColumn('recency', datediff(col('report_date'), col("latest_date")))
 
     print('-----------Saving Data ---------')
     result1 = result1.select('Contract', 'TVDuration', 'MovieDuration', 'RelaxDuration', 'ChildDuration', 'SportDuration', 'TotalDuration',\
          'latest_date', 'report_date', 'recency', 'active_rate', 'most_watch', 'taste')
+         
     result1.repartition(1).write.csv(save_path,header=True)
     result1.write.format('jdbc').option('url',url).option('driver',driver).option('dbtable','behavior').option('user',user).option('password',password).mode('overwrite').save()
 
